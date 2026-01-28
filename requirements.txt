@@ -1,0 +1,19 @@
+# LinkedIn Post Generator - Dependencies
+
+# FastAPI and server
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+
+# LangChain
+langchain>=0.1.0
+langchain-openai>=0.1.0
+
+# Vector store
+qdrant-client[fastembed]>=1.7.0
+
+# Pydantic
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# OpenAI
+openai>=1.10.0

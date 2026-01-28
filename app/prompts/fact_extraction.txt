@@ -1,0 +1,22 @@
+Analyze the following LinkedIn post and extract key facts and insights.
+
+## Post Content
+{post_content}
+
+## Topic
+{topic}
+
+## Instructions
+Extract:
+1. **Key Claims**: Main arguments or statements made
+2. **Personal Stories**: Any anecdotes or experiences shared
+3. **Lessons/Insights**: Takeaways or conclusions
+4. **Questions Posed**: Any open questions for the audience
+
+Return as JSON:
+{{
+  "key_claims": [...],
+  "personal_stories": [...],
+  "lessons": [...],
+  "questions": []
+}}
