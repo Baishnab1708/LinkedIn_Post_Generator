@@ -1,22 +1,31 @@
-Analyze the following LinkedIn post and extract key facts and insights.
+Analyze the following LinkedIn posts from a series and extract key facts and insights from EACH post.
 
-## Post Content
-{post_content}
-
-## Topic
-{topic}
+## Posts
+{posts_content}
 
 ## Instructions
-Extract:
+For EACH post, extract:
 1. **Key Claims**: Main arguments or statements made
 2. **Personal Stories**: Any anecdotes or experiences shared
 3. **Lessons/Insights**: Takeaways or conclusions
 4. **Questions Posed**: Any open questions for the audience
 
-Return as JSON:
-{{
-  "key_claims": [...],
-  "personal_stories": [...],
-  "lessons": [...],
-  "questions": []
-}}
+Return as JSON array (one object per post, in order):
+[
+  {{
+    "post_number": 1,
+    "key_claims": [...],
+    "personal_stories": [...],
+    "lessons": [...],
+    "questions": []
+  }},
+  {{
+    "post_number": 2,
+    "key_claims": [...],
+    "personal_stories": [...],
+    "lessons": [...],
+    "questions": []
+  }}
+]
+
+IMPORTANT: Return ONLY valid JSON array, no other text.

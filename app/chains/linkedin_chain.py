@@ -1,7 +1,7 @@
 from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from pathlib import Path
 import json
 
@@ -35,7 +35,6 @@ class LinkedInChain:
             if style_mode == StyleMode.SIMILAR 
             else settings.different_mode_temperature
         )
-        
         return AzureChatOpenAI(
             azure_deployment=settings.azure_openai_deployment,
             azure_endpoint=settings.azure_openai_endpoint,
@@ -45,11 +44,11 @@ class LinkedInChain:
             max_retries=5
         )
     
+    # Called by: generate_similar_post
     def _format_writing_examples(self, examples: list) -> str:
         """Format past writing examples for the prompt."""
         if not examples:
             return "No past examples available. Create fresh content."
-        
         formatted = []
         for i, ex in enumerate(examples, 1):
             formatted.append(
@@ -58,21 +57,21 @@ class LinkedInChain:
             )
         return "\n".join(formatted)
     
+    # Called by: generate_different_post
     def _format_topics_to_avoid(self, topics: list) -> str:
         """Format topics to avoid for the prompt."""
         if not topics:
             return "No previous topics to avoid."
-        
         return "\n".join([
             f"- {t.get('topic', 'Unknown')} (similarity: {t.get('similarity', 0):.0%})"
             for t in topics
         ])
     
+    # Called by: generate_different_post
     def _format_patterns_to_avoid(self, patterns: list) -> str:
         """Format patterns to avoid for the prompt."""
         if not patterns:
             return "No specific patterns to avoid."
-        
         unique_patterns = []
         seen = set()
         for p in patterns:
@@ -96,6 +95,7 @@ class LinkedInChain:
             return f"Include exactly {num_hashtags} relevant hashtags at the end"
         return "Do NOT include any hashtags"
     
+    # Called by: generator.py -> PostGeneratorService.generate_post (SIMILAR mode & first series post)
     async def generate_similar_post(
         self,
         topic: str,
@@ -108,29 +108,10 @@ class LinkedInChain:
         include_hashtags: bool = True,
         num_hashtags: int = 3
     ) -> str:
-        """
-        Generate a post similar to user's past style.
-        
-        Args:
-            topic: Post topic
-            tone: Desired tone
-            audience: Target audience
-            length: Desired length
-            writing_examples: Past writing examples
-            tone_patterns: Established tone patterns
-            include_emoji: Whether to include emojis
-            include_hashtags: Whether to include hashtags
-            num_hashtags: Number of hashtags
-            
-        Returns:
-            Generated post content
-        """
+        """Generate a post similar to user's past style."""
         llm = self._get_llm(StyleMode.SIMILAR)
-        
         prompt = PromptTemplate.from_template(self.similar_template)
-        
         chain = prompt | llm | self.output_parser
-        
         result = await chain.ainvoke({
             "topic": topic,
             "tone": tone,
@@ -144,9 +125,9 @@ class LinkedInChain:
             "emoji_instruction": self._get_emoji_instruction(include_emoji),
             "hashtag_instruction": self._get_hashtag_instruction(include_hashtags, num_hashtags)
         })
-        
         return result
     
+    # Called by: generator.py -> PostGeneratorService.generate_post (DIFFERENT mode)
     async def generate_different_post(
         self,
         topic: str,
@@ -159,29 +140,10 @@ class LinkedInChain:
         include_hashtags: bool = True,
         num_hashtags: int = 3
     ) -> str:
-        """
-        Generate a post different from user's past style.
-        
-        Args:
-            topic: Post topic
-            tone: Desired tone
-            audience: Target audience
-            length: Desired length
-            topics_to_avoid: Previously covered topics
-            patterns_to_avoid: Patterns to not repeat
-            include_emoji: Whether to include emojis
-            include_hashtags: Whether to include hashtags
-            num_hashtags: Number of hashtags
-            
-        Returns:
-            Generated post content
-        """
+        """Generate a post different from user's past style."""
         llm = self._get_llm(StyleMode.DIFFERENT)
-        
         prompt = PromptTemplate.from_template(self.different_template)
-        
         chain = prompt | llm | self.output_parser
-        
         result = await chain.ainvoke({
             "topic": topic,
             "tone": tone,
@@ -195,41 +157,33 @@ class LinkedInChain:
             "emoji_instruction": self._get_emoji_instruction(include_emoji),
             "hashtag_instruction": self._get_hashtag_instruction(include_hashtags, num_hashtags)
         })
-        
         return result
     
-    async def extract_facts(self, post_content: str, topic: str) -> Dict[str, List[str]]:
-        """
-        Extract key facts from a post for series context.
-        
-        Args:
-            post_content: The post content to analyze
-            topic: The topic of the post
-            
-        Returns:
-            Dictionary with key_claims, personal_stories, lessons, questions
-        """
+    # Called by: generator.py -> PostGeneratorService.generate_post (series continuation)
+    async def extract_facts(self, posts: List[Dict[str, Any]]) -> List[Dict[str, List[str]]]:
+        """Extract key facts from multiple posts in a SINGLE LLM call."""
+        if not posts:
+            return []
+        posts_content = "\n\n---\n\n".join([
+            f"### POST {i+1} (Topic: {post['metadata']['topic']})\n{post['metadata']['post_content']}"
+            for i, post in enumerate(posts)
+        ])
         llm = self._get_llm(StyleMode.SIMILAR)
         prompt = PromptTemplate.from_template(self.fact_extraction_template)
         chain = prompt | llm | self.output_parser
-        
-        result = await chain.ainvoke({
-            "post_content": post_content,
-            "topic": topic
-        })
-        
-        # Parse JSON response
+        result = await chain.ainvoke({"posts_content": posts_content})
         try:
-            return json.loads(result)
+            parsed = json.loads(result)
+            if isinstance(parsed, list):
+                return parsed
+            return [parsed]
         except json.JSONDecodeError:
-            # Return empty structure if parsing fails
-            return {
-                "key_claims": [],
-                "personal_stories": [],
-                "lessons": [],
-                "questions": []
-            }
+            return [
+                {"key_claims": [], "personal_stories": [], "lessons": [], "questions": []}
+                for _ in posts
+            ]
     
+    # Called by: generator.py -> PostGeneratorService.generate_post (series continuation)
     async def generate_series_post(
         self,
         topic: str,
@@ -243,28 +197,10 @@ class LinkedInChain:
         include_hashtags: bool = True,
         num_hashtags: int = 3
     ) -> str:
-        """
-        Generate a post that continues an existing series.
-        
-        Args:
-            topic: Post topic
-            tone: Desired tone
-            audience: Target audience
-            length: Desired length
-            series_facts: Formatted facts from previous posts
-            post_summaries: Summaries of previous posts
-            series_order: Position in the series (1, 2, 3...)
-            include_emoji: Whether to include emojis
-            include_hashtags: Whether to include hashtags
-            num_hashtags: Number of hashtags
-            
-        Returns:
-            Generated post content
-        """
-        llm = self._get_llm(StyleMode.SIMILAR)  # Series always uses similar mode
+        """Generate a post that continues an existing series."""
+        llm = self._get_llm(StyleMode.SIMILAR)
         prompt = PromptTemplate.from_template(self.series_template)
         chain = prompt | llm | self.output_parser
-        
         result = await chain.ainvoke({
             "topic": topic,
             "tone": tone,
@@ -276,7 +212,6 @@ class LinkedInChain:
             "emoji_instruction": self._get_emoji_instruction(include_emoji),
             "hashtag_instruction": self._get_hashtag_instruction(include_hashtags, num_hashtags)
         })
-        
         return result
 
 

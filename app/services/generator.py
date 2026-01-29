@@ -49,16 +49,12 @@ class PostGeneratorService:
                 series_posts = self.store.get_series_posts(request.user_id, series_id)
                 series_order = len(series_posts) + 1
                 
-                # Extract facts from all previous posts
-                all_facts = []
-                summaries = []
-                for post in series_posts:
-                    facts = await self.chain.extract_facts(
-                        post["metadata"]["post_content"],
-                        post["metadata"]["topic"]
-                    )
-                    all_facts.append(facts)
-                    summaries.append(f"Post {post['metadata']['series_order']}: {post['metadata']['topic']}")
+                # Extract facts from all previous posts in a SINGLE LLM call
+                all_facts = await self.chain.extract_facts(series_posts)
+                summaries = [
+                    f"Post {post['metadata']['series_order']}: {post['metadata']['topic']}"
+                    for post in series_posts
+                ]
                 
                 # Generate with series context
                 generated_post = await self.chain.generate_series_post(
