@@ -1,4 +1,3 @@
-
 import time
 import uuid
 from typing import List, Dict, Any, Tuple, Optional
@@ -11,10 +10,7 @@ from app.config.settings import settings
 
 
 class PostGeneratorService:
-    """
-    Consolidated service that handles the entire post generation pipeline.
-    Performs a single vector search and uses results for both topic checking and context.
-    """
+ 
     
     def __init__(self):
         self.store = vector_store

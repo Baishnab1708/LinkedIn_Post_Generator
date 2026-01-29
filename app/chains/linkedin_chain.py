@@ -108,10 +108,13 @@ class LinkedInChain:
         include_hashtags: bool = True,
         num_hashtags: int = 3
     ) -> str:
+
         """Generate a post similar to user's past style."""
+
         llm = self._get_llm(StyleMode.SIMILAR)
         prompt = PromptTemplate.from_template(self.similar_template)
         chain = prompt | llm | self.output_parser
+
         result = await chain.ainvoke({
             "topic": topic,
             "tone": tone,
@@ -168,16 +171,22 @@ class LinkedInChain:
             f"### POST {i+1} (Topic: {post['metadata']['topic']})\n{post['metadata']['post_content']}"
             for i, post in enumerate(posts)
         ])
+
         llm = self._get_llm(StyleMode.SIMILAR)
+
         prompt = PromptTemplate.from_template(self.fact_extraction_template)
+
         chain = prompt | llm | self.output_parser
+
         result = await chain.ainvoke({"posts_content": posts_content})
+
         try:
             parsed = json.loads(result)
             if isinstance(parsed, list):
                 return parsed
             return [parsed]
         except json.JSONDecodeError:
+
             return [
                 {"key_claims": [], "personal_stories": [], "lessons": [], "questions": []}
                 for _ in posts
@@ -197,10 +206,12 @@ class LinkedInChain:
         include_hashtags: bool = True,
         num_hashtags: int = 3
     ) -> str:
+
         """Generate a post that continues an existing series."""
         llm = self._get_llm(StyleMode.SIMILAR)
         prompt = PromptTemplate.from_template(self.series_template)
         chain = prompt | llm | self.output_parser
+        
         result = await chain.ainvoke({
             "topic": topic,
             "tone": tone,

@@ -1,8 +1,3 @@
-"""
-Output Validators - Safety and Format Checks
-Ensures generated posts meet quality standards.
-"""
-
 import re
 from typing import Tuple, List
 from app.config.settings import settings
